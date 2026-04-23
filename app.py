@@ -173,6 +173,9 @@ def main():
         <p style='text-align: center; color: gray; font-size: 14px;'>
         © 2026 UNAB - Ingeniería de Sistemas
         </p>
+        <p style='text-align: center; color: gray; font-size: 14px;'>
+        Realizado por Wilson Suarez
+        </p>
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
