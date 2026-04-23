@@ -1,183 +1,139 @@
 import os
-os.environ["YOLO_CONFIG_DIR"] = "/tmp/Ultralytics"
-
-import streamlit as st
-from PIL import Image, ImageDraw
 import numpy as np
 import pandas as pd
+import streamlit as st
+from PIL import Image, ImageDraw
 from ultralytics import YOLO
 
-# -----------------------
-# Configuración de página
-# -----------------------
-st.set_page_config(page_title="Detección de PPE", layout="wide")
+# Configuración de entorno
+os.environ["YOLO_CONFIG_DIR"] = "/tmp/Ultralytics"
 
 # -----------------------
-# Estilos simples (limpio)
-# -----------------------
-st.markdown("""
-<style>
-.main-title {
-    text-align: center;
-    color: #2E86C1;
-}
-.subtitle {
-    text-align: center;
-    font-size: 18px;
-    color: #555;
-}
-.card {
-    padding: 15px;
-    border-radius: 10px;
-    background-color: #F8F9F9;
-    margin-bottom: 15px;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# -----------------------
-# Diccionario traducción
+# CONFIGURACIÓN Y CONSTANTES
 # -----------------------
 TRADUCCION_CLASES = {
-    "boots": "Botas",
-    "earmuffs": "Orejeras",
-    "glasses": "Gafas",
-    "gloves": "Guantes",
-    "helmet": "Casco",
-    "person": "Persona",
-    "vest": "Chaleco"
+    "boots": "Botas", "earmuffs": "Orejeras", "glasses": "Gafas",
+    "gloves": "Guantes", "helmet": "Casco", "person": "Persona", "vest": "Chaleco"
 }
+EPP_REQUERIDO = {"Casco", "Chaleco"}
 
 # -----------------------
-# Cargar modelos
+# LÓGICA DE NEGOCIO (PROCESAMIENTO)
 # -----------------------
+
 @st.cache_resource
 def load_models():
-    modelo_personas = YOLO("yolov8n.pt")
-    modelo_ppe = YOLO("best.pt")
-    return modelo_personas, modelo_ppe
+    """Carga los modelos de YOLO una sola vez."""
+    return YOLO("yolov8n.pt"), YOLO("best.pt")
 
-modelo_personas, modelo_ppe = load_models()
+def get_person_boxes(results):
+    """Extrae coordenadas de personas detectadas."""
+    boxes = []
+    for box in results.boxes:
+        if int(box.cls[0]) == 0:  # Clase 0 es persona en COCO
+            boxes.append(map(int, box.xyxy[0]))
+    return boxes
 
-# -----------------------
-# Header
-# -----------------------
-st.markdown("<h1 class='main-title'>🏭 Sistema de Detección de EPP</h1>", unsafe_allow_html=True)
-st.markdown("<p class='subtitle'>Verificación automática de seguridad industrial</p>", unsafe_allow_html=True)
+def process_ppe_detection(image_crop, model_ppe):
+    """Analiza el EPP en un recorte de imagen y devuelve la imagen dibujada y datos."""
+    results = model_ppe(np.array(image_crop))[0]
+    draw = ImageDraw.Draw(image_crop)
+    detecciones = []
 
-st.markdown("---")
-
-# -----------------------
-# Selector de entrada
-# -----------------------
-opcion = st.radio("Selecciona la fuente de imagen:", ["📁 Subir imagen", "📸 Usar cámara"])
-
-foto = None
-
-if opcion == "📁 Subir imagen":
-    foto = st.file_uploader("Sube una imagen", type=["jpg", "png", "jpeg"])
-else:
-    foto = st.camera_input("Toma una foto")
-
-# -----------------------
-# Procesamiento
-# -----------------------
-if foto:
-    imagen_original = Image.open(foto).convert("RGB")
-
-    colA, colB = st.columns([1, 2])
-
-    with colA:
-        st.image(imagen_original, caption="Imagen cargada", use_container_width=True)
-
-    img_np = np.array(imagen_original)
-
-    with st.spinner("Analizando imagen..."):
-        resultados_personas = modelo_personas(img_np)[0]
-
-    personas = []
-    for box in resultados_personas.boxes:
+    for box in results.boxes:
         cls = int(box.cls[0])
-        if cls == 0:
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
-            personas.append((x1, y1, x2, y2))
+        label_en = model_ppe.names[cls]
+        
+        if label_en == "person": continue
 
-    with colB:
-        st.subheader(f"👥 Personas detectadas: {len(personas)}")
+        label_es = TRADUCCION_CLASES.get(label_en, label_en.capitalize())
+        conf = float(box.conf[0])
+        x1, y1, x2, y2 = map(int, box.xyxy[0])
 
-    st.markdown("---")
-
-    # -----------------------
-    # Procesar personas
-    # -----------------------
-    for i, (x1, y1, x2, y2) in enumerate(personas, 1):
-
-        st.markdown(f"### 👤 Trabajador {i}")
-
-        persona_crop = imagen_original.crop((x1, y1, x2, y2))
-        persona_np = np.array(persona_crop)
-
-        resultados_ppe = modelo_ppe(persona_np)[0]
-
-        draw = ImageDraw.Draw(persona_crop)
-        etiquetas = []
-        datos_analitica = []
-
-        for box in resultados_ppe.boxes:
-            cls = int(box.cls[0])
-            label_ingles = modelo_ppe.names[cls]
-
-            if label_ingles == "person":
-                continue
-
-            label_espanol = TRADUCCION_CLASES.get(label_ingles, label_ingles.capitalize())
-            conf = float(box.conf[0])
-
-            etiquetas.append(label_espanol)
-            datos_analitica.append({
-                "Equipo": label_espanol,
-                "Confianza": f"{conf*100:.2f}%"
-            })
-
-            x1o, y1o, x2o, y2o = map(int, box.xyxy[0])
-            draw.rectangle([x1o, y1o, x2o, y2o], outline="#00FF00", width=3)
-            draw.text((x1o, max(0, y1o - 15)), f"{label_espanol}", fill="#00FF00")
-
-        col1, col2 = st.columns([1, 2])
-
-        with col1:
-            st.image(persona_crop, caption="Detección", use_container_width=True)
-
-        with col2:
-            st.markdown("#### 🚥 Estado de seguridad")
-
-            requeridos = {"Casco", "Chaleco"}
-            presentes = set(etiquetas)
-
-            if requeridos.issubset(presentes):
-                st.success("🟢 Acceso permitido")
-            else:
-                faltantes = requeridos - presentes
-                st.error(f"🔴 Acceso denegado - Faltan: {', '.join(faltantes)}")
-
-            st.markdown("#### 📊 Confianza de detección")
-
-            if datos_analitica:
-                for d in datos_analitica:
-                    st.write(d["Equipo"])
-                    valor = float(d["Confianza"].replace("%", "")) / 100
-                    st.progress(valor)
-            else:
-                st.warning("No se detectó EPP")
-
-        st.markdown("---")
+        # Dibujo estético
+        draw.rectangle([x1, y1, x2, y2], outline="#00FF00", width=4)
+        draw.text((x1, max(0, y1 - 20)), f"{label_es} {conf:.2%}", fill="#00FF00")
+        
+        detecciones.append({"label": label_es, "conf": conf})
+        
+    return image_crop, detecciones
 
 # -----------------------
-# Footer
+# INTERFAZ DE USUARIO (UI)
 # -----------------------
-st.markdown("""
-<hr>
-<p style='text-align: center; color: gray; font-size: 13px;'>
-© Alfredo Diaz UNAB 2026
-</p>
-""", unsafe_allow_html=True)
+
+def inject_custom_css():
+    st.markdown("""
+        <style>
+        .main-title { text-align: center; color: #2E86C1; margin-bottom: 0px; }
+        .subtitle { text-align: center; font-size: 1.1rem; color: #555; margin-bottom: 2rem; }
+        hr { margin: 1rem 0; }
+        </style>
+    """, unsafe_allow_html=True)
+
+def main():
+    st.set_page_config(page_title="Seguridad Industrial IA", layout="wide")
+    inject_custom_css()
+    
+    modelo_personas, modelo_ppe = load_models()
+
+    # Header
+    st.markdown("<h1 class='main-title'>🏭 Sistema de Detección de EPP</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='subtitle'>Monitoreo de Seguridad en Tiempo Real</p>", unsafe_allow_html=True)
+
+    # Sidebar para controles
+    with st.sidebar:
+        st.header("Configuración")
+        fuente = st.radio("Fuente de entrada:", ["📁 Archivo local", "📸 Cámara"])
+        foto = st.file_uploader("Subir imagen", type=["jpg", "png"]) if fuente == "📁 Archivo local" else st.camera_input("Capturar")
+
+    if not foto:
+        st.info("Esperando entrada de imagen...")
+        return
+
+    # Procesamiento Principal
+    img_original = Image.open(foto).convert("RGB")
+    
+    with st.spinner("Detectando personal..."):
+        res_personas = modelo_personas(np.array(img_original))[0]
+        coords_personas = get_person_boxes(res_personas)
+
+    st.success(f"Detección finalizada: {len(coords_personas)} personas encontradas.")
+    
+    # Grid de resultados
+    for i, coords in enumerate(coords_personas, 1):
+        with st.container():
+            col_img, col_info = st.columns([1, 1.5])
+            
+            # Recorte y detección de EPP
+            crop = img_original.crop(coords)
+            img_detectada, lista_epp = process_ppe_detection(crop, modelo_ppe)
+            
+            with col_img:
+                st.image(img_detectada, caption=f"Trabajador {i}", use_container_width=True)
+
+            with col_info:
+                st.markdown(f"### Análisis Trabajador {i}")
+                
+                # Validación de Reglas
+                presentes = {d['label'] for d in lista_epp}
+                faltantes = EPP_REQUERIDO - presentes
+                
+                if not faltantes:
+                    st.success("✅ **ACCESO AUTORIZADO**: EPP Completo")
+                else:
+                    st.error(f"❌ **ACCESO DENEGADO**: Faltan {', '.join(faltantes)}")
+
+                # Métricas de confianza
+                if lista_epp:
+                    cols_m = st.columns(len(lista_epp))
+                    for idx, d in enumerate(lista_epp):
+                        cols_m[idx % 3].metric(d['label'], f"{d['conf']:.1%}")
+                
+        st.divider()
+
+    # Footer
+    st.caption("© 2026 UNAB - Ingeniería de Sistemas")
+
+if __name__ == "__main__":
+    main()
