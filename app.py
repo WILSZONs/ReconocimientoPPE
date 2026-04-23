@@ -11,8 +11,15 @@ os.environ["YOLO_CONFIG_DIR"] = "/tmp/Ultralytics"
 # CONFIGURACIÓN Y CONSTANTES
 # -----------------------
 TRADUCCION_CLASES = {
-    "boots": "Botas", "earmuffs": "Orejeras", "glasses": "Gafas",
-    "gloves": "Guantes", "helmet": "Casco", "person": "Persona", "vest": "Chaleco"
+    "No-hardhat": "Sin Casco",
+    "No-safety vest": "Sin Chaleco",
+    "No-mask": "Sin Mascarilla",
+    "Worker": "Trabajador",
+    "hardhat": "Casco",
+    "safety-vest": "Chaleco",
+    "boots": "Botas",
+    "glasses": "Gafas",
+    "gloves": "Guantes"
 }
 EPP_REQUERIDO = {"Casco", "Chaleco"}
 
