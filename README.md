@@ -8,7 +8,11 @@ Detección en tiempo real: Soporte para carga de imágenes locales y captura dir
 - Detección de personas (YOLOv8n).
 
 - Interfaz amigable: Visualización de resultados con indicadores de acceso (Permitido/Denegado) y niveles de confianza.
-
+  
+- Subiendo una imagen
 <img width="1916" height="855" alt="image" src="https://github.com/user-attachments/assets/700564ae-9b37-4981-8b2c-65925f42be0e" />
 
+- Usando la camara
+<img width="1919" height="830" alt="image" src="https://github.com/user-attachments/assets/4b680a1d-ccaa-4865-8ea6-bfdbdcab7513" />
 
+<img width="1479" height="145" alt="image" src="https://github.com/user-attachments/assets/47df5731-c998-41c6-abcf-eb849810cac8" />
