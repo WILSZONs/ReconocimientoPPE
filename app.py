@@ -123,7 +123,7 @@ def main():
             st.warning("⚠️ No se detectaron personas en la imagen.")
             return
 
-        st.markdown(f"### 👥 Personas en escena: {len(coords_personas)}")
+        st.markdown(f"### 👥 Personas detectadas: {len(coords_personas)}")
         st.divider()
 
         # Procesar cada persona detectada
